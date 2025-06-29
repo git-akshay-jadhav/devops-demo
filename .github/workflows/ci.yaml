@@ -1,15 +1,20 @@
 name: CI Pipeline
 on: [push]
+
 jobs:
   security-scan:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Scan manifests
-      uses: controlplaneio/kubesec-action@v1
-      with:
-        files: manifests/
-    - name: Scan container images
+
+    - name: Scan Kubernetes manifests with Kubesec
+      run: |
+        for file in $(find manifests -name '*.yaml'); do
+          echo "Scanning $file..."
+          curl -sSX POST --data-binary @$file https://v2.kubesec.io/scan | jq .
+        done
+
+    - name: Scan container images with Trivy
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: "nginx:1.25"
