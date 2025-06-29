@@ -1,0 +1,17 @@
+name: CI Pipeline
+on: [push]
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Scan manifests
+      uses: controlplaneio/kubesec-action@v1
+      with:
+        files: manifests/
+    - name: Scan container images
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: "nginx:1.25"
+        format: "table"
+        severity: "HIGH,CRITICAL"
