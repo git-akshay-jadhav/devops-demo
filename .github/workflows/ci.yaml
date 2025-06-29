@@ -1,22 +1,58 @@
-name: CI Pipeline
-on: [push]
+name: DevSecOps Pipeline
+on: 
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   security-scan:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Scan Kubernetes manifests with Kubesec
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Scan Kubernetes manifests
       run: |
         for file in $(find manifests -name '*.yaml'); do
-          echo "Scanning $file..."
+          echo "📄 Scanning $file..."
           curl -sSX POST --data-binary @$file https://v2.kubesec.io/scan | jq .
+          echo "----------------------------------------"
         done
-
-    - name: Scan container images with Trivy
+        
+    - name: Scan container images
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: "nginx:1.25"
         format: "table"
         severity: "HIGH,CRITICAL"
+        exit-code: 1  # Fail on critical vulnerabilities
+        ignore-unfixed: true
+        
+  build-and-deploy:
+    needs: security-scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: devops-demo:latest
+        
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl apply -f manifests/
+      env:
+        KUBECONFIG: ${{ secrets.KUBECONFIG }}
+        
+    - name: Verify deployment
+      run: |
+        kubectl get pods
+        kubectl get svc
